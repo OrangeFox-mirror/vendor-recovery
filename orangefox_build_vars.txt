@@ -5,7 +5,7 @@
 # These should be declared - in a shell script (eg, in "vendorsetup.sh"), or at the command line - before building
 #
 # Copyright (C) 2019-2021 OrangeFox Recovery Project
-# Date: 05 August 2021
+# Date: 05 October 2021
 #
 # -----------------------------------
 #
@@ -383,6 +383,7 @@
 "FOX_DRASTIC_SIZE_REDUCTION" [NEW] [EXPERIMENTAL!]
  - Set this to 1 for some really drastic attempts to reduce the size of the recovery image
  - This will remove source large files (including some fonts) from the build; don't worry if you see some
+ - You MUST always do a clean build every time you build with this variable being enabled
  - resource error messages in the recovery's debug screen
  - default = 0
 #
@@ -548,9 +549,11 @@
 - do not replace the default Magisk zip installer without first having tested the one you want to use on a full
 - range of stock and custom ROMs across all Android versions available for your device
 #
-"OF_RUN_POST_FORMAT_PROCESS" [NEW] [Experimental]
+"OF_RUN_POST_FORMAT_PROCESS" [Experimental] [DEPRECATED!]
+- This is DEPRECATED. Do NOT use it unless it has proved *absolutely necessary* to use it
 - set this to 1 to recreate automatically the Fox folders in /sdcard/ after formatting data
-- this can be helpful for those who wish to use MTP to copy files from their PC to the device immediately after formatting data
+- it can be helpful for those who wish to use MTP to copy files from their PC to the device immediately after formatting data
+- *However* it can cause issues with Android 11 encryption - so you have been warned!
 - default = 0
 #
 "FOX_VARIANT" [NEW]
