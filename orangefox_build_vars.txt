@@ -5,7 +5,7 @@
 # These should be declared - in a shell script (eg, in "vendorsetup.sh"), or at the command line - before building
 #
 # Copyright (C) 2019-2021 OrangeFox Recovery Project
-# Date: 05 October 2021
+# Date: 02 November 2021
 #
 # -----------------------------------
 #
@@ -560,5 +560,27 @@
 - Use this if building a specific variant for your device (eg, for MIUI, or FBE, or whatever variant for which the build is specific)
 - eg, export FOX_VARIANT=MIUI
 - default = default
+#
+"FOX_LEGACY_TOOLS" [NEW]
+- Set this to 1 in order to use "legacy" builds of some tools, for backward compatibility with really old kernels
+- This helps to avoid "kernel too old" errors while trying to run some tools
+- default = 0
+#
+"FOX_CUSTOM_BINS_TO_SDCARD" [NEW] [HIGHLY EXPERIMENTAL!]
+ - Set this to 1 to move the big OrangeFox custom binaries to the internal sdcard (/sdcard/Fox/bin/)
+ - There will be symlinks to these in the recovery ramdisk, and everything should be transparent
+ - Using this should result in a big reduction in the size of the recovery image, and so it can be used instead of "FOX_DRASTIC_SIZE_REDUCTION"
+ - It comes with some restrictions:
+      + you MUST always do a clean build every time you build with this variable being enabled
+      + some variables ('FOX_USE_BASH_SHELL' and 'FOX_ASH_IS_BASH' ) are NOT compatible with this
+      + this requires the /sdcard/Fox/ folder to be ALWAYS available to the recovery
+      + users MUST always flash the zip (flashing or booting an img will NOT do)
+      + a user who formats the data partition (or who deletes the Fox folder) MUST flash the zip again, after first rebooting to system
+ - You must test your builds THOROUGHLY if using this, to ensure that everything works as expected
+ - default = 0
+#
+"OF_SKIP_DECRYPTED_ADOPTED_STORAGE" [NEW] [EXPERIMENTAL]
+- Set this to 1 to try and work around issues with the binary Android 12 storage.xml files
+ - default = 0
 #
 # -----------------------------------

@@ -19,7 +19,7 @@
 # 	Please maintain this if you use this script or any part of it
 #
 # ******************************************************************************
-# 05 August 2021
+# 02 November 2021
 #
 # For optional environment variables - to be declared before building,
 # see "orangefox_build_vars.txt" for full details
@@ -68,13 +68,38 @@ abort() {
   exit $1
 }
 
+# whether a build var is enabled (accepts "1" or greater, and "true")
+function enabled() {
+local s="$1"
+  if [ -z "$s" -o "$s" = "0" -o "$s" = "false" ]; then
+     echo "0"
+     return
+  fi
+
+  if [ "$s" = "true" ]; then
+     echo "1"
+     return
+  fi
+ 
+  if [[ ! "$s" =~ ^[0-9]+$ ]]; then
+     echo "0"
+     return
+  fi
+
+  if [ "$s" -gt "0" ]; then
+     echo "1"
+  else
+     echo "0"
+  fi
+}
+
 # extreme reduction
 if [ "$FOX_EXTREME_SIZE_REDUCTION" = "1" ]; then
    export FOX_DRASTIC_SIZE_REDUCTION=1
 fi
 
 # remove all extras if FOX_DRASTIC_SIZE_REDUCTION is defined
-if [ "$FOX_DRASTIC_SIZE_REDUCTION" = "1" ]; then
+if [ "$FOX_DRASTIC_SIZE_REDUCTION" = "1" -a "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" != "1" ]; then
 	export FOX_USE_BASH_SHELL=0
 	export FOX_ASH_IS_BASH=0
 	export FOX_USE_TAR_BINARY=0
@@ -89,6 +114,19 @@ fi
 
 
 # check out some incompatible settings
+if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" = "1" ]; then
+   if [ "$FOX_USE_GREP_BINARY" = "1" ]; then
+      export FOX_USE_GREP_BINARY=0
+      echo -e "${WHITEONRED}-- 'FOX_CUSTOM_BINS_TO_SDCARD': ignoring incompatible build var 'FOX_USE_GREP_BINARY' ... ${NC}"
+   fi
+
+   if [ "$FOX_USE_BASH_SHELL" = "1" -o "$FOX_ASH_IS_BASH" = "1" ]; then
+     	echo -e "${WHITEONRED}-- ERROR! 'FOX_CUSTOM_BINS_TO_SDCARD' is incompatible with 'FOX_USE_BASH_SHELL' or 'FOX_ASH_IS_BASH'!${NC}"
+     	echo -e "${WHITEONRED}-- Sort out your build vars! Quitting ... ${NC}"
+     	abort 97
+   fi
+fi
+
 if [ "$OF_SUPPORT_ALL_BLOCK_OTA_UPDATES" = "1" ]; then
    if [ "$OF_DISABLE_MIUI_SPECIFIC_FEATURES" = "1" -o "$OF_TWRP_COMPATIBILITY_MODE" = "1" -o "$OF_VANILLA_BUILD" = "1" ]; then
       echo -e "${WHITEONRED}-- ERROR! \"OF_SUPPORT_ALL_BLOCK_OTA_UPDATES\" is incompatible with \"OF_DISABLE_MIUI_SPECIFIC_FEATURES\" or \"OF_TWRP_COMPATIBILITY_MODE\"${NC}"
@@ -161,6 +199,9 @@ fi
 # device name
 FOX_DEVICE=$(cut -d'_' -f2 <<<$TARGET_PRODUCT)
 
+# tmp for "FOX_CUSTOM_BINS_TO_SDCARD"
+FOX_BIN_tmp=$OUT/tmp_bin/FoxFiles
+
 # build_type
 if [ -z "$FOX_BUILD_TYPE" ]; then 
    export FOX_BUILD_TYPE=Unofficial
@@ -189,6 +230,7 @@ else
    fi
 fi
 
+RAMDISK_ETC=/etc
 RECOVERY_IMAGE="$OUT/$FOX_OUT_NAME.img"
 TMP_VENDOR_PATH="$OUT/../../../../vendor/$RECOVERY_DIR"
 DEFAULT_INSTALL_PARTITION="/dev/block/bootdevice/by-name/recovery" # !! DON'T change!!!
@@ -244,6 +286,13 @@ filesize() {
   [ -z "$1" -o -d "$1" ] && { echo "0"; return; }
   [ ! -e "$1" -a ! -h "$1" ] && { echo "0"; return; }
   stat -c %s "$1"
+}
+
+# generate a randomised build id
+generate_build_id() {
+local cmd="uuidgen -rx"
+  [ -z "$(which uuidgen)" ] && cmd="cat /proc/sys/kernel/random/uuid"
+  $cmd
 }
 
 # file_getprop <file> <property>
@@ -372,6 +421,13 @@ local TDT=$(date "+%d %B %Y")
 
   # copy FoxFiles/ to sdcard/Fox/
   $CP -a $FILES_DIR/ sdcard/Fox
+
+  # copy any custom bin files to /sdcard/Fox/FoxFiles/bin/ ?
+  if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" = "1" -a -d "$FOX_BIN_tmp/bin" ]; then
+     chmod +x $FOX_BIN_tmp/bin/*
+     $CP -a $FOX_BIN_tmp/ sdcard/Fox/
+     rm -rf $FOX_BIN_tmp
+  fi
   
   # any local changes to a port's installer directory?
   if [ -n "$FOX_PORTS_INSTALLER" ] && [ -d "$FOX_PORTS_INSTALLER" ]; then
@@ -619,21 +675,23 @@ local F=""
       echo -e "${GREEN}-- Pruning the ramdisk to reduce the size ... ${NC}"
 
       # remove some large files
-      rm -rf $FFil/nano
-      rm -f $FOX_RAMDISK/sbin/aapt
-      rm -f $FOX_RAMDISK/sbin/zip
-      rm -f $FOX_RAMDISK/sbin/nano
-      rm -f $FOX_RAMDISK/sbin/gnutar
-      rm -f $FOX_RAMDISK/sbin/gnused
-      rm -f $FOX_RAMDISK/sbin/bash
-      rm -f $FOX_RAMDISK/etc/bash.bashrc
-      [ "$FOX_REPLACE_BUSYBOX_PS" != "1" ] && rm -f $FFil/ps
-      rm -rf $FFil/Tools
-      if [ "$OF_VANILLA_BUILD" = "1" ]; then
-         rm -rf $FFil/OF_avb20
-         rm -rf $FFil/OF_verity_crypt
+      if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" != "1" ]; then
+      	 rm -rf $FFil/nano
+      	 rm -f $FOX_RAMDISK/sbin/aapt
+      	 rm -f $FOX_RAMDISK/sbin/zip
+      	 rm -f $FOX_RAMDISK/sbin/nano
+      	 rm -f $FOX_RAMDISK/sbin/gnutar
+      	 rm -f $FOX_RAMDISK/sbin/gnused
+      	 rm -f $FOX_RAMDISK/sbin/bash
+      	 rm -f $FOX_RAMDISK/etc/bash.bashrc
+      	 [ "$FOX_REPLACE_BUSYBOX_PS" != "1" ] && rm -f $FFil/ps
+      	 rm -rf $FFil/Tools
+      	 if [ "$OF_VANILLA_BUILD" = "1" ]; then
+            rm -rf $FFil/OF_avb20
+            rm -rf $FFil/OF_verity_crypt
+      	 fi
       fi
-      
+
       # fonts to be deleted      
       declare -a FontFiles=(
         "Amatic" 
@@ -709,6 +767,151 @@ local F=""
 	# return to where we started from
 	cd $CURRDIR
 }
+
+# have some big binaries in /sdcard/Fox/FoxFiles/bin/ ?
+process_custom_bins_to_sdcard() {
+local tmp1
+local tmp2
+local ramdisk_sbindir=$FOX_RAMDISK/sbin
+local sdcard_bin=/sdcard/Fox/FoxFiles/bin
+local mksync="3"
+
+  if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" != "1" ]; then
+     return
+  fi
+
+  echo -e "${WHITEONRED}-- 'FOX_CUSTOM_BINS_TO_SDCARD' used; Ensure that you are doing a CLEAN BUILD, else, it *WILL* all go pear-shaped!!${NC}"
+
+  [ -d $FOX_BIN_tmp/bin/ ] && rm -rf $FOX_BIN_tmp/bin/
+  mkdir -p $FOX_BIN_tmp/bin/
+
+  [ -f $ramdisk_sbindir/bash -a ! -h $ramdisk_sbindir/bash ] && {
+     	mv -f $ramdisk_sbindir/bash $FOX_BIN_tmp/bin/
+     	[ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ] && ln -sf $sdcard_bin/bash $ramdisk_sbindir/bash
+  }
+
+  [ -f $ramdisk_sbindir/gnutar ] && {
+     	mv -f $ramdisk_sbindir/gnutar $FOX_BIN_tmp/bin/
+     	[ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ] && ln -sf $sdcard_bin/gnutar $ramdisk_sbindir/gnutar
+  }
+
+  [ -f $ramdisk_sbindir/gnused ] && {
+     	mv -f $ramdisk_sbindir/gnused $FOX_BIN_tmp/bin/
+     	[ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ] && ln -sf $sdcard_bin/gnused $ramdisk_sbindir/gnused
+  }
+
+  [ -f $ramdisk_sbindir/aapt ] && {
+     	mv -f $ramdisk_sbindir/aapt $FOX_BIN_tmp/bin/
+     	[ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ] && ln -sf $sdcard_bin/aapt $ramdisk_sbindir/aapt
+  }
+
+  # our custom infozip binary is bigger than 512,000 bytes; otherwise, leave it
+  [ -f $ramdisk_sbindir/zip -a $(filesize $ramdisk_sbindir/zip) -gt 512000 ] && {
+     	mv -f $ramdisk_sbindir/zip $FOX_BIN_tmp/bin/
+     	[ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ] && ln -sf $sdcard_bin/zip $ramdisk_sbindir/zip
+  }
+
+  [ "$FOX_USE_XZ_UTILS" = "1" ] && {
+     	[ -f $FOX_VENDOR_PATH/Files/xz ] && {
+     	   $CP -pf $FOX_VENDOR_PATH/Files/xz $FOX_BIN_tmp/bin/lzma
+     	   [ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ] && {
+     	      rm -f $ramdisk_sbindir/lzma $ramdisk_sbindir/xz
+     	      ln -sf $sdcard_bin/lzma $ramdisk_sbindir/lzma
+     	      ln -sf lzma $ramdisk_sbindir/xz
+     	   }
+     	}
+  }
+
+  [ "$FOX_USE_NANO_EDITOR" = "1" -a -f "$ramdisk_sbindir/nano" ] && {
+     	$CP -af $FOX_VENDOR_PATH/Files/nano/ $FOX_BIN_tmp/bin/
+     	F="$ramdisk_sbindir/nano"
+     	[ "$FOX_CUSTOM_BINS_TO_SDCARD" != "1" ] && sed -i -e "s|^NANO_DIR=.*|NANO_DIR=$sdcard_bin/nano|" $F
+  }
+     
+ # 1=copy at runtime; 2=symlinks at runtime; 3=symlinks at build time ($mksync)
+ if [ "$FOX_CUSTOM_BINS_TO_SDCARD" = "$mksync" ]; then
+    return
+ fi
+ 
+ echo -e "${GREEN}-- FOX_CUSTOM_BINS_TO_SDCARD: creating script to process $sdcard_bin/* for the recovery ramdisk ... ${NC}"
+
+ if [ "$FOX_CUSTOM_BINS_TO_SDCARD" = "1" ]; then
+    tmp2="cp"
+ else
+    tmp2="sym"
+ fi
+
+# create the script
+tmp1=$FOX_BIN_tmp/bin/sdcard_to_bin.sh
+rm -f $tmp1
+cat << EOF >> "$tmp1"
+#!/sbin/sh -x
+        cmd="$tmp2"
+        chmod +x /sdcard/Fox/FoxFiles/bin/*
+        if [ "\$cmd" = "cp" ]; then
+           [ -d $sdcard_bin/nano/ ] && mv /sbin/nano /sbin/nano_script
+           cp -af $sdcard_bin/* /sbin/
+           [ -d $sdcard_bin/nano/ ] && { mv -f /sbin/nano/ /FFiles/; mv -f /sbin/nano_script /sbin/nano; }
+        else
+	   files="aapt bash gnused gnutar lzma zip"
+	   set -- \$files
+	   while [ -n "\$1" ]
+  	   do
+     	      i="\$1"
+     	      [ -f $sdcard_bin/"\$i" ] && ln -sf $sdcard_bin/\$i /sbin/\$i
+     	      shift
+  	   done
+        fi
+        [ -f $sdcard_bin/lzma ] && { rm -f /sbin/xz; ln -sf lzma /sbin/xz; }
+ 	exit 0;
+EOF
+chmod 0755 $tmp1
+#cat $tmp1
+ 
+# run the script to copy /sdcard/Fox/FoxFiles/bin/* to the ramdisk at runtime
+# source this script in postecoveryboot.sh ("source /sbin/from_fox_sd.sh")
+tmp1=$ramdisk_sbindir/from_fox_sd.sh
+rm -f $tmp1
+cat << EOF >> "$tmp1"
+fxDIR=$sdcard_bin;
+fxF=\$fxDIR/sdcard_to_bin.sh;
+if [ -f \$fxF ]; then
+   chmod +x \$fxDIR/*;
+   echo "I: Running \$fxF !" >> /tmp/recovery.log;
+   \$fxF;
+fi
+rm -f "/sbin/from_fox_sd.sh"
+EOF
+chmod 0755 $tmp1
+
+#######
+return
+#######
+
+# embed call into postrecoveryboot.sh  [WiP]
+ tmp1=/sbin/from_fox_sd.sh
+ tmp2=$ramdisk_sbindir/postrecoveryboot.sh
+ if [ -f $tmp2 ]; then
+      echo "-- Patching postrecoveryboot.sh ..."
+      if [ -n "$(grep $tmp1 $tmp2)" ]; then
+          echo "-- Code already inserted. Moving on ..."
+      else
+         if [ -n "$(grep '#!/sbin/sh' $tmp2)" ]; then
+            echo "-- Shebang found in postrecoveryboot.sh; inserting code after it ..."
+            sed -i -e '/#!\/sbin\/sh/asource \/sbin\/from_fox_sd.sh' $tmp2;
+         else
+            echo "-- No shebang in postrecoveryboot.sh; inserting code on the first line ..."
+            echo "#" >> $tmp2; # ensure that something is in the file
+            sed -i -e '1i/source \/sbin\/from_fox_sd.sh' $tmp2;
+         fi
+      fi
+ else
+      echo "-- Creating postrecoveryboot.sh ..."
+      echo "$tmp1;" >> $tmp2
+ fi
+ chmod 0755 $tmp2
+
+} # end function process_custom_bins_to_sdcard()
 
 # ****************************************************
 # *** now the real work starts!
@@ -830,11 +1033,13 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
   # replace busybox lzma (and "xz") with our own 
   # use the full "xz" binary for lzma, and for xz - smaller in size, and does the same job
   if [ "$OF_USE_MAGISKBOOT_FOR_ALL_PATCHES" != "1" -o "$FOX_USE_XZ_UTILS" = "1" ]; then
-     echo -e "${GREEN}-- Replacing the busybox \"lzma\" command with our own full version ...${NC}"
-     rm -f $FOX_RAMDISK/sbin/lzma
-     rm -f $FOX_RAMDISK/sbin/xz
-     $CP -p $FOX_VENDOR_PATH/Files/xz $FOX_RAMDISK/sbin/lzma
-     ln -s lzma $FOX_RAMDISK/sbin/xz
+     if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" != "1" ]; then
+     	echo -e "${GREEN}-- Replacing the busybox \"lzma\" command with our own full version ...${NC}"
+     	rm -f $FOX_RAMDISK/sbin/lzma
+     	rm -f $FOX_RAMDISK/sbin/xz
+     	$CP -p $FOX_VENDOR_PATH/Files/xz $FOX_RAMDISK/sbin/lzma
+     	ln -s lzma $FOX_RAMDISK/sbin/xz
+     fi
   fi
   
   # system_root stuff
@@ -898,7 +1103,11 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
      rm -f $FOX_RAMDISK/etc/bash.bashrc
   else
      echo -e "${GREEN}-- Copying bash ...${NC}"
-     $CP -p $FOX_VENDOR_PATH/Files/bash $FOX_RAMDISK/sbin/bash
+     if [ "$FOX_LEGACY_TOOLS" = "1" ]; then
+	$CP -pf $FOX_VENDOR_PATH/Files/compat/bash $FOX_RAMDISK/sbin/
+     else
+     	$CP -p $FOX_VENDOR_PATH/Files/bash $FOX_RAMDISK/sbin/
+     fi
      $CP -p $FOX_VENDOR_PATH/Files/fox.bashrc $FOX_RAMDISK/etc/bash.bashrc
      chmod 0755 $FOX_RAMDISK/sbin/bash
      if [ "$FOX_ASH_IS_BASH" = "1" ]; then
@@ -939,21 +1148,31 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
   # Include nano editor ?
   if [ "$FOX_USE_NANO_EDITOR" = "1" ]; then
       echo -e "${GREEN}-- Copying nano editor ...${NC}"
-      $CP -af $FOX_VENDOR_PATH/Files/nano/ $FOX_RAMDISK/FFiles/
       $CP -af $FOX_VENDOR_PATH/Files/nano/sbin/nano $FOX_RAMDISK/sbin/
+      if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" != "1" ]; then
+      	 $CP -af $FOX_VENDOR_PATH/Files/nano/ $FOX_RAMDISK/FFiles/
+      fi
   fi
 
   # Include standalone "tar" binary ?
   if [ "$FOX_USE_TAR_BINARY" = "1" ]; then
       echo -e "${GREEN}-- Copying the GNU \"tar\" binary (gnutar) ...${NC}"
-      $CP -pf $FOX_VENDOR_PATH/Files/gnutar $FOX_RAMDISK/sbin/
+      if [ "$FOX_LEGACY_TOOLS" = "1" ]; then
+      	 $CP -pf $FOX_VENDOR_PATH/Files/compat/gnutar $FOX_RAMDISK/sbin/
+      else
+      	 $CP -pf $FOX_VENDOR_PATH/Files/gnutar $FOX_RAMDISK/sbin/
+      fi
       chmod 0755 $FOX_RAMDISK/sbin/gnutar
   fi
 
   # Include standalone "sed" binary ?
   if [ "$FOX_USE_SED_BINARY" = "1" ]; then
       echo -e "${GREEN}-- Copying the GNU \"sed\" binary (gnused) ...${NC}"
-      $CP -pf $FOX_VENDOR_PATH/Files/gnused $FOX_RAMDISK/sbin/
+      if [ "$FOX_LEGACY_TOOLS" = "1" ]; then
+	 $CP -pf $FOX_VENDOR_PATH/Files/compat/gnused $FOX_RAMDISK/sbin/
+      else
+      	 $CP -pf $FOX_VENDOR_PATH/Files/gnused $FOX_RAMDISK/sbin/
+      fi
       chmod 0755 $FOX_RAMDISK/sbin/gnused
   fi
 
@@ -965,7 +1184,11 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
       }
   else
       echo -e "${GREEN}-- Copying the OrangeFox InfoZip \"zip\" binary ...${NC}"
-      $CP -pf $FOX_VENDOR_PATH/Files/zip $FOX_RAMDISK/sbin/
+      if [ "$FOX_LEGACY_TOOLS" = "1" ]; then
+      	 $CP -pf $FOX_VENDOR_PATH/Files/compat/zip $FOX_RAMDISK/sbin/
+      else
+      	 $CP -pf $FOX_VENDOR_PATH/Files/zip $FOX_RAMDISK/sbin/
+      fi
       chmod 0755 $FOX_RAMDISK/sbin/zip
   fi
 
@@ -1019,7 +1242,11 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
   if [ "$FOX_USE_GREP_BINARY" = "1" -a -x $FOX_VENDOR_PATH/Files/grep ]; then
       echo -e "${GREEN}-- Copying the GNU \"grep\" binary ...${NC}"
       rm -f $FOX_RAMDISK/sbin/grep $FOX_RAMDISK/sbin/egrep $FOX_RAMDISK/sbin/fgrep
-      $CP -pf $FOX_VENDOR_PATH/Files/grep $FOX_RAMDISK/sbin/
+      if [ "$FOX_LEGACY_TOOLS" = "1" ]; then
+      	 $CP -pf $FOX_VENDOR_PATH/Files/compat/grep $FOX_RAMDISK/sbin/
+      else
+      	 $CP -pf $FOX_VENDOR_PATH/Files/grep $FOX_RAMDISK/sbin/
+      fi
       echo '#!/sbin/sh' &> "$FOX_RAMDISK/sbin/fgrep"
       echo '#!/sbin/sh' &> "$FOX_RAMDISK/sbin/egrep"
       echo 'exec grep -F "$@"' >> "$FOX_RAMDISK/sbin/fgrep"
@@ -1037,6 +1264,12 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
             echo -e "${WHITEONRED}-- Using default image for maintainer's about section ...${NC}"
       fi
   fi
+
+#########################################################################################
+  if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" = "1" ]; then
+     process_custom_bins_to_sdcard;
+  fi
+#########################################################################################
 
   # Get Magisk version
   tmp1=$FOX_VENDOR_PATH/FoxFiles/Magisk.zip
@@ -1104,6 +1337,14 @@ if [ "$FOX_VENDOR_CMD" != "Fox_After_Recovery_Image" ]; then
   if [ -n "$FOX_RECOVERY_BOOT_PARTITION" ]; then
      echo "BOOT_PARTITION=$FOX_RECOVERY_BOOT_PARTITION" >> $FOX_RAMDISK/etc/fox.cfg
   fi
+
+  # save the build id
+   echo -e "${GREEN}-- Generating the build ID ${NC}"
+   tmp1=$(generate_build_id)
+   grep -q "ro.build.fox_id=" $DEFAULT_PROP_ROOT && \
+  	sed -i -e "s/ro.build.fox_id=.*/ro.build.fox_id=$tmp1/g" $DEFAULT_PROP_ROOT || \
+  	echo "ro.build.fox_id=$tmp1" >> $DEFAULT_PROP_ROOT
+   echo "ro.build.fox_id=$tmp1" >> $FOX_RAMDISK/etc/fox.cfg
 
   # let's be clear where we are ...
   if [ "$FOX_VENDOR_CMD" = "Fox_Before_Recovery_Image" ]; then
