@@ -23,12 +23,12 @@
 #
 #
 # * Author: DarthJabba9
-# * Date:   20210803
+# * Date:   20211112
 # * Identify some ROM features and hardware components
 # * Do some other sundry stuff
 #
 #
-SCRIPT_LASTMOD_DATE="20210803"
+SCRIPT_LASTMOD_DATE="20211112"
 C="/tmp_cust"
 LOG="/tmp/recovery.log"
 CFG="/etc/orangefox.cfg"
@@ -554,6 +554,11 @@ backup_restore_FS
 
 # get kernel logs right now
 dmesg &> /tmp/dmesg.log
+
+# get logcat right now
+if [ -f "/system/bin/logcat" -o -f "/sbin/logcat" ]; then
+   logcat -d &> /tmp/logcat.log
+fi
 
 #
 Get_Details
