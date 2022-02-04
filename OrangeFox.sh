@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #	This file is part of the OrangeFox Recovery Project
-# 	Copyright (C) 2018-2021 The OrangeFox Recovery Project
+# 	Copyright (C) 2018-2022 The OrangeFox Recovery Project
 #
 #	OrangeFox is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 # 	Please maintain this if you use this script or any part of it
 #
 # ******************************************************************************
-# 18 December 2021
+# 04 February 2022
 #
 # For optional environment variables - to be declared before building,
 # see "orangefox_build_vars.txt" for full details
@@ -485,6 +485,12 @@ local TDT=$(date "+%d %B %Y")
      rm -rf /tmp/fox_build_tmp/
      $CP -pf $tmp .
      sed -i -e "s/^OF_AB_DEVICE=.*/OF_AB_DEVICE=\"1\"/" $F
+  fi
+
+  # whether to enable magisk 24+ patching of vbmeta
+  if [ "$OF_PATCH_VBMETA_FLAG" = "1" ]; then
+     echo -e "${RED}-- Enabling PATCHVBMETAFLAG for the installation... ${NC}"
+     sed -i -e "s/^OF_PATCH_VBMETA_FLAG=.*/OF_PATCH_VBMETA_FLAG=\"1\"/" $F
   fi
 
   # Reset Settings
