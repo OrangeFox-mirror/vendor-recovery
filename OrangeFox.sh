@@ -518,6 +518,20 @@ local TDT=$(date "+%d %B %Y")
      rm -f $OF_WORKING_DIR/sdcard/Fox/FoxFiles/unrootmagisk.zip
   fi
 
+  # Use the Latest release of Magisk? [Sushrut1101]
+  if [[ "$FOX_USE_LATEST_MAGISK" = "1" && -n "$FOX_USE_SPECIFIC_MAGISK_ZIP" ]]; then
+   echo ""
+   echo -e "${WHITEONRED}-- Build OrangeFox: ERROR! ${NC}"
+   echo -e "${WHITEONRED}-- Do NOT use \"FOX_USE_LATEST_MAGISK\" and \"FOX_USE_SPECIFIC_MAGISK_ZIP\" together. Aborting! ${NC}"
+   echo ""
+   abort 99
+  fi
+  if [ $FOX_USE_LATEST_MAGISK = "1" ]; then
+     echo -e "${WHITEONGREEN}-- Downloading the Latest Release of Magisk...${NC}"
+     LATEST_MAGISK_URL="$(curl -sL https://api.github.com/repos/topjohnwu/Magisk/releases/latest | grep browser_download_url | grep Magisk- | cut -d : -f 2,3 | sed 's/"//g')"
+     aria2c $LATEST_MAGISK_URL -O $OF_WORKING_DIR/sdcard/Fox/FoxFiles/Magisk.zip >/dev/null || wget $LATEST_MAGISK_URL -o $OF_WORKING_DIR/sdcard/Fox/FoxFiles/Magisk.zip 2>/dev/null
+  fi
+
   # are we using a specific magisk zip?
   if [ -n "$FOX_USE_SPECIFIC_MAGISK_ZIP" ]; then
      if [ -e $FOX_USE_SPECIFIC_MAGISK_ZIP ]; then
