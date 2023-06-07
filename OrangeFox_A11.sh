@@ -19,7 +19,7 @@
 # 	Please maintain this if you use this script or any part of it
 #
 # ******************************************************************************
-# 30 April 2022
+# 07 June 2023
 #
 # *** This script is for the OrangeFox Android 11.0 manifest ***
 #
@@ -154,7 +154,7 @@ if [ "$(enabled $FOX_CUSTOM_BINS_TO_SDCARD)" = "1" ]; then
 fi
 
 if [ "$OF_SUPPORT_ALL_BLOCK_OTA_UPDATES" = "1" ]; then
-   if [ "$OF_DISABLE_MIUI_SPECIFIC_FEATURES" = "1" -o "$OF_TWRP_COMPATIBILITY_MODE" = "1" -o "$OF_VANILLA_BUILD" = "1" ]; then
+   if [ "$OF_DISABLE_MIUI_SPECIFIC_FEATURES" = "1" -o "$OF_TWRP_COMPATIBILITY_MODE" = "1" -o "$FOX_VANILLA_BUILD" = "1" ]; then
       echo -e "${WHITEONRED}-- ERROR! \"OF_SUPPORT_ALL_BLOCK_OTA_UPDATES\" is incompatible with \"OF_DISABLE_MIUI_SPECIFIC_FEATURES\" or \"OF_TWRP_COMPATIBILITY_MODE\"${NC}"
       echo -e "${WHITEONRED}-- Sort out your build vars! Quitting ... ${NC}"
       abort 98
@@ -196,17 +196,29 @@ if [ -z "$FOX_VENDOR_CMD" ]; then
    abort 100
 fi
 
+# A/B
+IS_AB_DEVICE=0
+if [ "$FOX_AB_DEVICE" = "1" -o "$OF_AB_DEVICE" = "1" -o "$AB_OTA_UPDATER" = "true" -o "$BOARD_USES_RECOVERY_AS_BOOT" = "true" ]; then
+   IS_AB_DEVICE=1
+fi
+
 # virtual A/B (VAB)
-if [ "$OF_AB_DEVICE" = "1" -a "$BOARD_USES_RECOVERY_AS_BOOT" = "true" ]; then
+IS_VIRTUAL_AB_DEVICE=0
+if [ "$FOX_VIRTUAL_AB_DEVICE" = "1" -o "$OF_VIRTUAL_AB_DEVICE" = "1"  ]; then
+   IS_VIRTUAL_AB_DEVICE=1
+   IS_AB_DEVICE=1
+fi
+
+if [ "$IS_AB_DEVICE" = "1" ]; then
     if [ -n "$BOARD_BOOT_HEADER_VERSION" ]; then
-       [ "$BOARD_BOOT_HEADER_VERSION" -gt 2 -a -z "$OF_VIRTUAL_AB_DEVICE" ] && export OF_VIRTUAL_AB_DEVICE="1"
+       [ "$BOARD_BOOT_HEADER_VERSION" -gt 2 ] && IS_VIRTUAL_AB_DEVICE="1"
     fi
 fi
 
-if [ "$OF_VIRTUAL_AB_DEVICE" = "1" ]; then
-    echo -e "${GREEN}-- The device is a virtual A/B device .... ${NC}"
-    export OF_AB_DEVICE=1
-#    export OF_USE_NEW_MAGISKBOOT=1
+# Disable the init.d addon for vAB devices
+if [ "$IS_VIRTUAL_AB_DEVICE" = "1" ]; then
+    echo -e "${GREEN}-- The device is a virtual A/B device  - disabling the init.d addon .... ${NC}"
+    export FOX_DELETE_INITD_ADDON=1
 fi
 
 # --------- magiskboot vars --------
@@ -215,7 +227,7 @@ NEW_MAGISKBOOT_BIN="magiskboot_new"
 
 # magiskboot 23+ and repatch issues?
 #if [ "$OF_NEW_MAGISKBOOT_FORCE_AVB_VERIFY" = "1" ]; then
-#   if [ "$OF_VIRTUAL_AB_DEVICE" = "1" ]; then
+#   if [ "$FOX_VIRTUAL_AB_DEVICE" = "1" ]; then
 #      echo -e "${RED}-- OrangeFox.sh FATAL ERROR - Virtual A/B device - you cannot also use \"OF_NEW_MAGISKBOOT_FORCE_AVB_VERIFY\". ${NC}"
 #      echo -e "${RED}-- Quitting now ... ${NC}"
 #      abort 101
@@ -224,6 +236,12 @@ NEW_MAGISKBOOT_BIN="magiskboot_new"
 
 # Virtual A/B devices?
 [ "$BOARD_USES_RECOVERY_AS_BOOT" = "true" ] && COMPILED_IMAGE_FILE="boot.img" || COMPILED_IMAGE_FILE="recovery.img"
+
+# vanilla build
+IS_VANILLA_BUILD=0
+if [ "$FOX_VANILLA_BUILD" = "1" -o "$OF_VANILLA_BUILD" = "1" ]; then
+   IS_VANILLA_BUILD=1
+fi
 
 RECOVERY_DIR="recovery"
 FOX_VENDOR_PATH=vendor/$RECOVERY_DIR
@@ -320,7 +338,13 @@ if [ -z "$FOX_REPLACE_BUSYBOX_PS" ]; then
 fi
 
 # alternative devices
-[ -n "$OF_TARGET_DEVICES" -a -z "$TARGET_DEVICE_ALT" ] && export TARGET_DEVICE_ALT="$OF_TARGET_DEVICES"
+if [ -z "$TARGET_DEVICE_ALT" ]; then
+   if [ -n "$FOX_TARGET_DEVICES" ]; then
+   	export TARGET_DEVICE_ALT="$FOX_TARGET_DEVICES"
+   elif [ -n "$OF_TARGET_DEVICES" ]; then
+   	export TARGET_DEVICE_ALT="$OF_TARGET_DEVICES"
+   fi
+fi
 
 # copy recovery.img/boot.img
 [ -f $OUT/$COMPILED_IMAGE_FILE ] && $CP $OUT/$COMPILED_IMAGE_FILE $RECOVERY_IMAGE
@@ -531,10 +555,8 @@ local TDT=$(date "+%d %B %Y")
   fi
 
   # patch update-binary (which is a script) to run only for the current device
-  # (mido is the default)
   local F="$OF_WORKING_DIR/META-INF/com/google/android/update-binary"
-  sed -i -e "s/mido/$FOX_DEVICE/g" $F
-  sed -i -e "s/ALT_DEVICE/$FOX_DEVICE_ALT/g" $F
+  sed -i -e "s|^TARGET_DEVICE=.*|TARGET_DEVICE=\"$FOX_DEVICE\"|" $F
 
   # embed the release version
   sed -i -e "s/RELEASE_VER/$FOX_BUILD/" $F
@@ -573,7 +595,7 @@ local TDT=$(date "+%d %B %Y")
   fi
 
   # A/B devices
-  if [ "$OF_AB_DEVICE" = "1" ]; then
+  if [ "$IS_AB_DEVICE" = "1" ]; then
      echo -e "${RED}-- A/B device - copying magiskboot to zip installer ... ${NC}"
      tmp=$FOX_RAMDISK/$RAMDISK_SBIN/magiskboot
      [ ! -e "$tmp" ] && tmp=$FOX_VENDOR_PATH/prebuilt/$TARGET_ARCH/magiskboot
@@ -583,25 +605,15 @@ local TDT=$(date "+%d %B %Y")
        abort 200
      }
      $CP -pf $tmp ./magiskboot
-     sed -i -e "s/^OF_AB_DEVICE=.*/OF_AB_DEVICE=\"1\"/" $F
+     sed -i -e "s/^FOX_AB_DEVICE=.*/FOX_AB_DEVICE=\"1\"/" $F
   fi
   rm -rf /tmp/fox_build_tmp/
 
   # whether to enable magisk 24+ patching of vbmeta
-  if [ "$OF_PATCH_VBMETA_FLAG" = "1" ]; then
+  if [ "$FOX_PATCH_VBMETA_FLAG" = "1" -o "$OF_PATCH_VBMETA_FLAG" = "1" ]; then
      echo -e "${RED}-- Enabling PATCHVBMETAFLAG for the installation... ${NC}"
-     sed -i -e "s/^OF_PATCH_VBMETA_FLAG=.*/OF_PATCH_VBMETA_FLAG=\"1\"/" $F
+     sed -i -e "s/^FOX_PATCH_VBMETA_FLAG=.*/FOX_PATCH_VBMETA_FLAG=\"1\"/" $F
   fi
-
-#  if [ "$OF_USE_NEW_MAGISKBOOT" = "1" ]; then
-#     echo -e "${RED}-- Using magiskboot v23+ for the installation... ${NC}"
-#     sed -i -e "s/^OF_USE_NEW_MAGISKBOOT=.*/OF_USE_NEW_MAGISKBOOT=\"1\"/" $F
-#     $CP -pf $FOX_VENDOR_PATH/FoxExtras/FFiles/$NEW_MAGISKBOOT_BIN ./magiskboot
-#  fi
-#
-#  if [ "$OF_NEW_MAGISKBOOT_FORCE_AVB_VERIFY" = "1" ]; then
-#     echo -e "${RED}-- Magiskboot v23+ repack issue will be patched... ${NC}"
-#  fi
 
   # Reset Settings
   if [ "$FOX_RESET_SETTINGS" = "disabled" ]; then
@@ -610,9 +622,9 @@ local TDT=$(date "+%d %B %Y")
   fi
 
   # skip all patches ?
-  if [ "$OF_VANILLA_BUILD" = "1" ]; then
+  if [ "$IS_VANILLA_BUILD" = "1" ]; then
      echo -e "${RED}-- This build will skip all OrangeFox patches ... ${NC}"
-     sed -i -e "s/^OF_VANILLA_BUILD=.*/OF_VANILLA_BUILD=\"1\"/" $F
+     sed -i -e "s/^FOX_VANILLA_BUILD=.*/FOX_VANILLA_BUILD=\"1\"/" $F
   fi
 
   # omit AromaFM ?
@@ -754,7 +766,7 @@ local F=""
       	 rm -rf $FOX_RAMDISK/$RAMDISK_ETC/terminfo
       	 [ "$FOX_REPLACE_BUSYBOX_PS" != "1" ] && rm -f $FFil/ps
       	 rm -rf $FFil/Tools
-      	 if [ "$OF_VANILLA_BUILD" = "1" ]; then
+      	 if [ "$FOX_VANILLA_BUILD" = "1" ]; then
            rm -rf $FFil/OF_avb20
            rm -rf $FFil/OF_verity_crypt
       	 fi

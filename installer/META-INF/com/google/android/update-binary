@@ -15,8 +15,8 @@ if [ "$FOX_INSTALLER_DEBUG_MODE" = "1" ]; then
 fi
 
 # the target device(s)
-TARGET_DEVICE="mido"
-TARGET_DEVICE_ALT="ALT_DEVICE"
+TARGET_DEVICE="MAIN_DEVICE"
+TARGET_DEVICE_ALT=""
 
 # getprop
 GETPROP=$(which getprop)
@@ -53,19 +53,19 @@ EX_DIR=/tmp/ofox_installer
 ERROR_CODE=0
 
 # AB device?
-OF_AB_DEVICE=""
+FOX_AB_DEVICE="0"
 
 # enable vbmeta patching for magiskboot 24+ ?
-OF_PATCH_VBMETA_FLAG=0
+FOX_PATCH_VBMETA_FLAG=0
 
 # Reset OrangeFox settings to default?
 FOX_RESET_SETTINGS="1"
 
 # build a vanilla version that skips all OrangeFox patches?
-OF_VANILLA_BUILD=0
+FOX_VANILLA_BUILD=0
 
 # last_modified
-MOD_DATE="20220507"
+MOD_DATE="20230607"
 
 # sundry glodal defaults
 # VEND_DIR="/vendor"
@@ -381,7 +381,7 @@ local C="/cache/"
 local AB="/data/cache/"
 local D="/data/"
 
-  if [ "$OF_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ]; then
+  if [ "$FOX_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ]; then
      [ -d $AB ] && { echo "$AB"; return; }
      mount_part "/data" > /dev/null 2>&1
      mkdir -p $AB > /dev/null 2>&1
@@ -426,7 +426,7 @@ local F="0"
      fi 
  fi
  
- if [ "$OF_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ]; then
+ if [ "$FOX_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ]; then
     ui_print "- A/B device: the post-install patches will not be processed."
     return
  fi
@@ -520,7 +520,7 @@ local PART
 	fi
 
 	# enable the magiskboot 24+ vbmeta patch?
-	if [ "$OF_PATCH_VBMETA_FLAG" = "1" ]; then
+	if [ "$FOX_PATCH_VBMETA_FLAG" = "1" ]; then
 	   export PATCHVBMETAFLAG=true
 	else
 	   export PATCHVBMETAFLAG=false
@@ -587,7 +587,7 @@ local Is_ABD="0"
     [ -z "$PART" ] && PART=$RECOVERY_PARTITION
 
     # either we've been told that it is A/B, or, it really is A/B
-    [ "$OF_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ] && Is_ABD="1"
+    [ "$FOX_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ] && Is_ABD="1"
     [ "$Is_ABD" = "1" ] && {
        ui_print "- The device is an A/B device."
        
@@ -695,7 +695,7 @@ Main() {
 # Prevent the stock recovery from replacing this recovery
 	MountThemAll
 	
-	if [ "$OF_VANILLA_BUILD" = "1" ]; then
+	if [ "$FOX_VANILLA_BUILD" = "1" ]; then
 	   ui_print "- Not disabling stock recovery overwrites!"	
 	else
 	   ui_print "- Disabling stock recovery overwrites..."
@@ -722,7 +722,7 @@ Main() {
 	ui_print " "
 
 	# don't reboot automatically if it is an A/B device, and OrangeFox is running
-	if [ "$OF_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ]; then
+	if [ "$FOX_AB_DEVICE" = "1" -o "$(Is_AB_Device)" = "1" ]; then
 	   F=$($GETPROP "orangefox.postinit.status")
 	   [ -z "$F" ] && F=$($GETPROP "orangefox.crash_counter")
 	   if [ -n "$F" ]; then
