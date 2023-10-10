@@ -439,6 +439,12 @@
 - make sure you also set OF_SAMSUNG_DEVICE to 1
 - default = 0
 #
+"FOX_DYNAMIC_SAMSUNG_FIX" [NEW]
+- set this to 1 to provide a workaround for bug in Samsung exynos dynamic partition devices, which causes a bootloop on encountering some binaries
+- when enabled, certain binaries (eg, bash, nano, aapt, etc) are removed from (or not added to) the build
+- use this only if the recovery doesn't boot on your Samsung dynamic-partition exynos device
+- default = 0
+#
 "OF_DEVICE_WITHOUT_PERSIST" [NEW]
 - set this to 1 if your device does not have a /persist partition
 - default = 0
@@ -505,12 +511,6 @@
 #
 "FOX_USE_XZ_UTILS" [NEW]
 - set this to 1 if you want the XZ Utils (lzma, xz) to be added to the build (the binary is about 260kb in size)
-- default = 0
-#
-"FOX_DYNAMIC_SAMSUNG_FIX" [NEW] 
-- set this to 1 to provide a workaround for bug in Samsung exynos dynamic partition devices, which causes a bootloop on encountering some binaries
-- when enabled, certain binaries (eg, bash, nano, aapt, etc) are removed from (or not added to) the build 
-- use this only if the recovery doesn't boot on your Samsung dynamic partition exynos device
 - default = 0
 #
 "FOX_USE_NANO_EDITOR"
