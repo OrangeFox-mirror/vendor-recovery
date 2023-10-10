@@ -5,7 +5,7 @@
 # These should be declared - in a shell script (eg, in "vendorsetup.sh"), or at the command line - before building
 #
 # Copyright (C) 2019-2023 OrangeFox Recovery Project
-# Date: 07 June 2023
+# Date: 10 October 2023
 #
 # -----------------------------------
 #
@@ -18,9 +18,6 @@
 "FOX_AB_DEVICE"
    - whether the device is an A/B device
    - set to 1 if your device is an A/B device (** make sure that it really is **)
-   - if you enable this, all these will be set automatically to "1":
-    	OF_USE_MAGISKBOOT
-    	OF_USE_MAGISKBOOT_FOR_ALL_PATCHES
    - default = 0
 #
 "FOX_PORTS_TMP" 
@@ -124,7 +121,6 @@
    - DM-Verity or Forced-Encryption settings, which will be left alone if that is
    - what the user has chosen) - this is for the purpose of stopping MIUI from
    - overwriting OrangeFox with its own stock recovery
-   - "OF_USE_MAGISKBOOT" must also be set to "1" if you want to use this
    - default = 0
 #
 "OF_DISABLE_UPDATEZIP"
@@ -431,11 +427,16 @@
 - all decryption/recovery passwords are successfully entered)
 - default = 0
 #
+"OF_SAMSUNG_DEVICE" [NEW]
+- set this to 1 to state categorically that you are building for a Samsung device
+- if not used, then the build process will try to determine this for itself by checking for "ro.product.manufacturer" (which must say "samsung")
+- default = 0
+#
 "OF_NO_SAMSUNG_SPECIAL" [NEW]
 - set this to 1 to disable some operations relating only to Samsung devices - these are:
 -   1) appending "SEANDROIDENFORCE" to the recovery image of a Samsung device
 -   2) creating an Odin flashable tar file of the recovery image
-- all decryption/recovery passwords are successfully entered)
+- make sure you also set OF_SAMSUNG_DEVICE to 1
 - default = 0
 #
 "OF_DEVICE_WITHOUT_PERSIST" [NEW]

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #	This file is part of the OrangeFox Recovery Project
-# 	Copyright (C) 2018-2022 The OrangeFox Recovery Project
+# 	Copyright (C) 2018-2023 The OrangeFox Recovery Project
 #
 #	OrangeFox is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 # 	Please maintain this if you use this script or any part of it
 #
 # ******************************************************************************
-# 07 June 2023
+# 10 October 2023
 #
 # *** This script is for the OrangeFox Android 11.0 manifest ***
 #
@@ -384,6 +384,9 @@ fi
 if [ -h "$FOX_RAMDISK/$RAMDISK_ETC" -a -d "$FOX_RAMDISK/$RAMDISK_SYSTEM_ETC" ]; then
    RAMDISK_ETC=$RAMDISK_SYSTEM_ETC
 fi
+
+## Samsung stuff
+[ "$FOX_NO_SAMSUNG_SPECIAL" = "1" ] && export OF_NO_SAMSUNG_SPECIAL=1
 
 # workaround for some Samsung bugs
 if [ "$FOX_DYNAMIC_SAMSUNG_FIX" = "1" ]; then
