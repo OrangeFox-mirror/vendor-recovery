@@ -1343,11 +1343,15 @@ if [ "$FOX_VENDOR_CMD" = "Fox_Before_Recovery_Image" ]; then
 #########################################################################################
   
   # Get Magisk version
+  MAGISK_VER=""
   tmp1=$FOX_VENDOR_PATH/FoxFiles/Magisk.zip
   if [ -n "$FOX_USE_SPECIFIC_MAGISK_ZIP" -a -e "$FOX_USE_SPECIFIC_MAGISK_ZIP" ]; then
      tmp1=$FOX_USE_SPECIFIC_MAGISK_ZIP
   fi
-  MAGISK_VER=$(unzip -c $tmp1 common/util_functions.sh | grep MAGISK_VER= | sed -E 's+MAGISK_VER="(.*)"+\1+')
+  tmp2=$(unzip -l $tmp1 | grep common/util_functions.sh)
+  if [ -n "$tmp2" ]; then
+     MAGISK_VER=$(unzip -c $tmp1 common/util_functions.sh | grep MAGISK_VER= | sed -E 's+MAGISK_VER="(.*)"+\1+')
+  fi
   if [ -z "$MAGISK_VER" ]; then
      tmp2=$(unzip -c $tmp1 assets/util_functions.sh | grep "MAGISK_VER=")
      MAGISK_VER=$(cut -d= -f2 <<<$tmp2 | sed "s|[',]||g")
